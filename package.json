@@ -1,0 +1,81 @@
+{
+  "name": "@orange-soft/strapi-meilisearch-sync",
+  "version": "1.0.0",
+  "description": "Index Strapi content into Meilisearch with UI-configurable flattening, relation-aware routes, real-time sync and cascade reindexing.",
+  "keywords": [
+    "strapi",
+    "strapi-plugin",
+    "meilisearch",
+    "search",
+    "indexing",
+    "sync",
+    "headless-cms"
+  ],
+  "license": "MIT",
+  "author": "Justin Moh <moh@os.my>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orange-soft/strapi-meilisearch-sync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/orange-soft/strapi-meilisearch-sync/issues"
+  },
+  "homepage": "https://github.com/orange-soft/strapi-meilisearch-sync#readme",
+  "type": "commonjs",
+  "exports": {
+    "./package.json": "./package.json",
+    "./strapi-admin": {
+      "source": "./admin/src/index.js",
+      "import": "./dist/admin/index.mjs",
+      "require": "./dist/admin/index.js",
+      "default": "./dist/admin/index.js"
+    },
+    "./strapi-server": {
+      "source": "./server/src/index.js",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "strapi-plugin build",
+    "watch": "strapi-plugin watch",
+    "verify": "strapi-plugin verify",
+    "prepare": "strapi-plugin build"
+  },
+  "devDependencies": {
+    "@strapi/design-system": "^2.0.0-rc.30",
+    "@strapi/icons": "^2.0.0-rc.30",
+    "@strapi/sdk-plugin": "^5.4.0",
+    "@strapi/strapi": "^5.33.0",
+    "prettier": "^3.8.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.3",
+    "styled-components": "^6.3.8"
+  },
+  "peerDependencies": {
+    "@strapi/design-system": "^2.0.0-rc.0",
+    "@strapi/icons": "^2.0.0-rc.0",
+    "@strapi/strapi": "^5.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "strapi": {
+    "kind": "plugin",
+    "name": "search-sync",
+    "displayName": "Search Sync",
+    "description": "Index content into Meilisearch with real-time sync"
+  }
+}
