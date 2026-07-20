@@ -48,8 +48,13 @@ function validateConfig(raw) {
       for (const [target, specs] of Object.entries(cfg.fields)) {
         if (!Array.isArray(specs)) { errors.push(`${path}.fields.${target}: must be an array of sources`); continue; }
         specs.forEach((s, i) => {
-          if (!s.source) errors.push(`${path}.fields.${target}[${i}]: source required`);
-          if (!TRANSFORMS.has(s.transform)) errors.push(`${path}.fields.${target}[${i}]: unknown transform "${s.transform}"`);
+          const at = `${path}.fields.${target}[${i}]`;
+          if (!s.source) errors.push(`${at}: source required`);
+          if (!TRANSFORMS.has(s.transform)) errors.push(`${at}: unknown transform "${s.transform}"`);
+          // Optional deeper-selection keys.
+          if ('only' in s && !Array.isArray(s.only)) errors.push(`${at}: "only" must be an array of component uids`);
+          if ('field' in s && typeof s.field !== 'string') errors.push(`${at}: "field" must be a string`);
+          if ('component' in s && typeof s.component !== 'string') errors.push(`${at}: "component" must be a string`);
         });
       }
     }

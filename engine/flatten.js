@@ -85,14 +85,49 @@ function walkComponentValue(value, componentUid, ctx, seen = new Set()) {
   return out.filter(Boolean);
 }
 
-/** Walk a dynamic-zone array; each item carries __component to resolve its schema. */
-function walkDynamicZone(value, ctx) {
+/**
+ * Walk a dynamic-zone array; each item carries __component to resolve its schema.
+ * `opts.only` (a list/Set of component uids) restricts the walk to those variants.
+ */
+function walkDynamicZone(value, ctx, opts = {}) {
   if (!Array.isArray(value)) return [];
+  const only =
+    opts.only && opts.only.length ? (opts.only instanceof Set ? opts.only : new Set(opts.only)) : null;
   return value.flatMap((item) => {
     const uid = item && item.__component;
     if (!uid) return [];
+    if (only && !only.has(uid)) return [];
     return walkComponentValue(item, uid, ctx);
   });
+}
+
+/** Resolve a media value (single or first-of-many) to a URL. */
+function mediaUrl(m) {
+  if (!m) return '';
+  const one = Array.isArray(m) ? m[0] : m;
+  return (one && (one.url || (one.formats && one.formats.thumbnail && one.formats.thumbnail.url))) || '';
+}
+
+/**
+ * Extract one field out of the component instances inside a component/dynamic-zone
+ * source — the "one layer deeper" pick. Returns the field's text from every
+ * matching instance, joined.
+ *
+ *   - source is a dynamic zone → read `field` off every item whose __component
+ *     matches `component` (or all items when `component` is omitted).
+ *   - source is a component (single or repeatable) → read `field` off each instance.
+ *
+ * When the picked field is itself a component / dynamic zone, it is walked
+ * recursively (so nested repeatable text stays searchable); otherwise `transform`
+ * decides how the scalar/rich/media value is read.
+ */
+function extractLeaf(fattr, value, transform, ctx) {
+  if (value == null) return [];
+  if (fattr && fattr.type === 'component') return walkComponentValue(value, fattr.component, ctx);
+  if (fattr && fattr.type === 'dynamiczone') return walkDynamicZone(value, ctx);
+  if (transform === 'html' || (fattr && isRichAttr(fattr))) return [htmlToText(value)];
+  if (transform === 'media' || (fattr && fattr.type === 'media')) return [mediaUrl(value)];
+  return [String(value).trim()];
 }
 
 // ---- Extractor factories (the UI "transform" menu) --------------------------
@@ -115,24 +150,59 @@ const html = (path) => ({
 });
 
 /** walk a component field (repeatable or single) */
-const components = (...fields) => ({
+const components = (field) => ({
   kind: 'walk-component',
-  deps: fields,
-  run: (entry, ctx) =>
-    fields
-      .flatMap((field) => {
-        const attr = ctx.attrOf(field);
-        if (!attr || attr.type !== 'component') return [];
-        return walkComponentValue(entry[field], attr.component, ctx);
-      })
-      .join(' '),
+  deps: [field],
+  run: (entry, ctx) => {
+    const attr = ctx.attrOf(field);
+    if (!attr || attr.type !== 'component') return '';
+    return walkComponentValue(entry[field], attr.component, ctx).join(' ');
+  },
 });
 
-/** walk a dynamic-zone field */
-const dz = (field) => ({
+/** walk a dynamic-zone field, optionally restricted to `only` component uids */
+const dz = (field, opts = {}) => ({
   kind: 'walk-dz',
   deps: [field],
-  run: (entry, ctx) => walkDynamicZone(entry[field], ctx).join(' '),
+  run: (entry, ctx) => walkDynamicZone(entry[field], ctx, opts).join(' '),
+});
+
+/**
+ * Pick a single field out of a component / dynamic-zone source (one layer deeper).
+ *   pick('sections', { component: 'section.company-intro', field: 'description', transform: 'html' })
+ *   pick('seo_settings', { field: 'metaDescription', transform: 'text' })
+ */
+const pick = (source, { component, field, transform } = {}) => ({
+  kind: 'pick',
+  deps: [source],
+  run: (entry, ctx) => {
+    const attr = ctx.attrOf(source);
+    const val = entry[source];
+    if (!attr || val == null || !field) return '';
+
+    let instances = [];
+    let compUidOf;
+    if (attr.type === 'dynamiczone') {
+      instances = (Array.isArray(val) ? val : []).filter(
+        (it) => it && it.__component && (!component || it.__component === component)
+      );
+      compUidOf = (it) => it.__component;
+    } else if (attr.type === 'component') {
+      instances = Array.isArray(val) ? val : [val];
+      compUidOf = () => attr.component;
+    } else {
+      return ''; // pick only applies to component / dynamic-zone sources
+    }
+
+    const out = [];
+    for (const inst of instances) {
+      if (inst == null) continue;
+      const compSchema = ctx.getComponent(compUidOf(inst));
+      const fattr = compSchema && compSchema.attributes && compSchema.attributes[field];
+      out.push(...extractLeaf(fattr, inst[field], transform, ctx));
+    }
+    return out.filter(Boolean).join(' ');
+  },
 });
 
 /** resolve a media field to a URL */
@@ -159,6 +229,6 @@ const join = (...extractors) => ({
 });
 
 module.exports = {
-  f, html, components, dz, media, join,
-  htmlToText, isTextAttr, isRichAttr, walkComponentValue, walkDynamicZone, readPath,
+  f, html, components, dz, media, join, pick,
+  htmlToText, mediaUrl, isTextAttr, isRichAttr, walkComponentValue, walkDynamicZone, extractLeaf, readPath,
 };

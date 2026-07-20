@@ -7,7 +7,7 @@
  * This is the bridge between "data the UI edits" and "functions the engine runs".
  */
 
-const { f, html, components, dz, join } = require('./flatten');
+const { f, html, components, dz, media, join, pick } = require('./flatten');
 const { seg, resolveRoute } = require('./route');
 
 function readPath(entry, path) {
@@ -24,23 +24,30 @@ function condTrue(cond, entry) {
   return !!v;
 }
 
-/** Compile one field's list of {source, transform} specs into an extractor. */
+/** Compile one {source, transform, ...} spec into an extractor. */
+function compileSpec(s) {
+  // A `field` targets one attribute *inside* a component/dz source → pinpoint pick.
+  // (This also covers nested component/dz leaves, which pick() walks recursively.)
+  if (s.field) {
+    return pick(s.source, { component: s.component, field: s.field, transform: s.transform });
+  }
+  switch (s.transform) {
+    case 'html': return html(s.source);
+    case 'walk-component': return components(s.source);
+    case 'walk-dz': return dz(s.source, { only: s.only });
+    case 'media': return media(s.source);
+    case 'text':
+    default: return f(s.source);
+  }
+}
+
+/** Compile one field's list of specs into an extractor. */
 function compileField(specs) {
-  if (specs.length === 1 && specs[0].transform === 'media') {
+  // Lone media field → the flat { media } shape (kept for the displayed thumbnail).
+  if (specs.length === 1 && specs[0].transform === 'media' && !specs[0].field) {
     return { media: specs[0].source };
   }
-  const extractors = specs
-    .map((s) => {
-      switch (s.transform) {
-        case 'html': return html(s.source);
-        case 'walk-component': return components(s.source);
-        case 'walk-dz': return dz(s.source);
-        case 'media': return null; // media only meaningful as a lone spec
-        case 'text':
-        default: return f(s.source);
-      }
-    })
-    .filter(Boolean);
+  const extractors = specs.map(compileSpec).filter(Boolean);
   if (extractors.length === 1) return extractors[0];
   return join(...extractors);
 }

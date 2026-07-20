@@ -40,6 +40,33 @@ function segmentFields(ct, types) {
     .map(([name]) => name);
 }
 
+/**
+ * Describe a component's own attributes for the "one layer deeper" pickers:
+ * every field's name / kind / applicable transforms, so the editor can pinpoint
+ * (e.g. section.company-intro → description) instead of only walking the whole thing.
+ * Nested component / dynamic-zone fields are reported (kind = component/dynamiczone)
+ * so the UI can offer to walk just that sub-tree.
+ */
+function describeComponent(uid, strapi) {
+  const comp = strapi.components && strapi.components[uid];
+  if (!comp) return { uid, displayName: uid, fields: [] };
+  const fields = [];
+  for (const [name, attr] of Object.entries(comp.attributes || {})) {
+    if (SYSTEM_FIELDS.has(name)) continue;
+    const { kind, transforms } = classify(attr);
+    const field = { name, type: attr.type, kind, transforms };
+    if (attr.type === 'component') field.component = attr.component;
+    if (attr.type === 'dynamiczone') field.components = attr.components || [];
+    if (attr.customField) field.customField = attr.customField;
+    fields.push(field);
+  }
+  return {
+    uid,
+    displayName: (comp.info && comp.info.displayName) || uid,
+    fields,
+  };
+}
+
 function introspectOne(uid, ct, strapi) {
   const localized = !!(ct.pluginOptions && ct.pluginOptions.i18n && ct.pluginOptions.i18n.localized);
   const fields = [];
@@ -54,8 +81,14 @@ function introspectOne(uid, ct, strapi) {
     if (attr.type === 'uid' && !slugField) slugField = name;
 
     const field = { name, type: attr.type, kind, transforms };
-    if (attr.type === 'component') field.component = attr.component;
-    if (attr.type === 'dynamiczone') field.components = attr.components || [];
+    if (attr.type === 'component') {
+      field.component = attr.component;
+      field.componentSchemas = [describeComponent(attr.component, strapi)];
+    }
+    if (attr.type === 'dynamiczone') {
+      field.components = attr.components || [];
+      field.componentSchemas = (attr.components || []).map((u) => describeComponent(u, strapi));
+    }
     if (attr.customField) field.customField = attr.customField;
     fields.push(field);
 

@@ -24,7 +24,7 @@ Search Sync handles all of this and is configured entirely from the admin panel.
 
 ## Features
 
-- **Flatten toolkit** — per field, choose a transform: `plain text`, `CKEditor → text`, `walk component`, `walk dynamic zone`, `media → URL`. Dynamic-zone/component walking is schema-aware and recursive, so new component variants stay searchable automatically.
+- **Flatten toolkit** — per field, choose a transform: `plain text`, `CKEditor → text`, `walk component`, `walk dynamic zone`, `media → URL`. Dynamic-zone/component walking is schema-aware and recursive, so new component variants stay searchable automatically. Walks can also go **one layer deeper** — restrict a dynamic zone to specific components, or pinpoint a single field of a single component — right from the UI.
 - **Relation-aware route builder** — build a page URL from `prefix` + segments, each an entry field or a hop across a relation. Or a **conditional** route (`if/then/else`, e.g. internal page vs external link).
 - **Real-time sync** — a document-service middleware upserts/removes on create / update / publish / unpublish / delete.
 - **Cascade reindex** — when a parent's slug changes, children whose URL depends on it are reindexed automatically (derived from the routes, not hand-listed).
@@ -150,6 +150,9 @@ The config is plain JSON (stored in the DB, editable via `PUT /search-sync/confi
 ```
 
 - **Transforms**: `text` · `html` · `walk-component` · `walk-dz` · `media`
+- **Deeper selection** (component / dynamic-zone sources) — instead of walking the whole thing, narrow it down:
+  - **Walk only some components** of a dynamic zone: add `only: ["section.company-intro", …]` to a `walk-dz` spec.
+  - **Pinpoint one field** of one component: `{ source: "sections", component: "section.company-intro", field: "description", transform: "html" }`. On a plain component source, drop `component`: `{ source: "seo_settings", field: "metaDescription", transform: "text" }`. If the picked field is itself a component / dynamic zone, it is walked recursively.
 - **Conditions** (skip rules / conditional routes): `{ field, truthy }` · `{ field, falsy }` · `{ field, empty }` · `{ field, equals }`
 - **Conditional route**: `{ kind: "conditional", if: <condition>, then: <pattern>, else: <pattern | { kind: "field", field }> }`
 
