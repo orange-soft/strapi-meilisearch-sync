@@ -83,11 +83,29 @@ module.exports = ({ strapi }) => ({
 
     const entry = documentId
       ? await strapi.documents(uid).findOne({ documentId, populate, status: 'published', ...(locale ? { locale } : {}) })
-      : (await strapi.documents(uid).findMany({ populate, limit: 1, status: 'published', ...(locale ? { locale } : {}) }))[0];
+      : (await strapi.documents(uid).findMany({ populate, limit: 1, sort: 'updatedAt:desc', status: 'published', ...(locale ? { locale } : {}) }))[0];
 
     if (!entry) return { found: false };
     const out = buildDocument({ entry, mapping, strapi, contentTypeUid: uid, locale });
-    return { found: true, title: entry.title, documentId: entry.documentId, ...out };
+    return { found: true, title: entry.title, documentId: entry.documentId, updatedAt: entry.updatedAt, ...out };
+  },
+
+  /** Published entries of a mapped type (newest first) for the preview picker. */
+  async entries({ uid }) {
+    await ensureLoaded(strapi);
+    if (!getMappings()[uid]) throw new Error(`content-type ${uid} is not indexed`);
+    const localized = isLocalized(strapi, uid);
+    const locale = localized ? defaultLocale() : undefined;
+    const rows = await strapi.documents(uid).findMany({
+      limit: 100, sort: 'updatedAt:desc', status: 'published', ...(locale ? { locale } : {}),
+    });
+    return {
+      entries: rows.map((e) => ({
+        documentId: e.documentId,
+        label: e.title || e.name || e.heading || e.slug || e.documentId,
+        updatedAt: e.updatedAt,
+      })),
+    };
   },
 
   /** Content-type schema for the UI editors (relations, field kinds, transforms). */

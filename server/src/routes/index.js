@@ -18,6 +18,7 @@ module.exports = {
     routes: [
       route('GET', '/status', 'status'),
       route('GET', '/preview', 'preview'),
+      route('GET', '/entries', 'entries'),
       route('POST', '/reindex', 'reindex'),
       route('GET', '/schema', 'schema'),
       route('GET', '/config', 'getConfig'),

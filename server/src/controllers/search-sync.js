@@ -11,6 +11,11 @@ module.exports = ({ strapi }) => ({
     if (!uid) return ctx.badRequest('uid query param required');
     ctx.body = await svc(strapi).preview({ uid, documentId });
   },
+  async entries(ctx) {
+    const { uid } = ctx.query;
+    if (!uid) return ctx.badRequest('uid query param required');
+    ctx.body = await svc(strapi).entries({ uid });
+  },
   async reindex(ctx) {
     const { uid } = ctx.request.body || {};
     ctx.body = await svc(strapi).reindex({ uid });

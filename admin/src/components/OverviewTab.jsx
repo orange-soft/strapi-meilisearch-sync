@@ -19,6 +19,8 @@ const OverviewTab = () => {
   const [busy, setBusy] = useState(null);
 
   const [previewUid, setPreviewUid] = useState('');
+  const [previewDocId, setPreviewDocId] = useState('__latest');
+  const [entries, setEntries] = useState([]);
   const [preview, setPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -53,11 +55,25 @@ const OverviewTab = () => {
     }
   };
 
-  const loadPreview = useCallback(async (uid) => {
+  // When the content type changes, load its entries and reset to "latest".
+  const loadEntries = useCallback(async (uid) => {
+    if (!uid) { setEntries([]); return; }
+    try {
+      const res = await get(`/${PLUGIN_ID}/entries`, { params: { uid } });
+      setEntries(res.data.entries || []);
+    } catch {
+      setEntries([]);
+    }
+  }, [get]);
+
+  useEffect(() => { setPreviewDocId('__latest'); loadEntries(previewUid); }, [previewUid, loadEntries]);
+
+  const loadPreview = useCallback(async (uid, docId) => {
     if (!uid) return;
     setPreviewLoading(true); setPreview(null);
     try {
-      const res = await get(`/${PLUGIN_ID}/preview`, { params: { uid } });
+      const documentId = docId && docId !== '__latest' ? docId : undefined;
+      const res = await get(`/${PLUGIN_ID}/preview`, { params: { uid, ...(documentId ? { documentId } : {}) } });
       setPreview(res.data);
     } catch (err) {
       setPreview({ error: err.message || 'Preview failed' });
@@ -66,7 +82,7 @@ const OverviewTab = () => {
     }
   }, [get]);
 
-  useEffect(() => { loadPreview(previewUid); }, [previewUid, loadPreview]);
+  useEffect(() => { loadPreview(previewUid, previewDocId); }, [previewUid, previewDocId, loadPreview]);
 
   return (
     <Flex direction="column" alignItems="stretch" gap={6}>
@@ -139,13 +155,21 @@ const OverviewTab = () => {
         <Flex direction="column" alignItems="stretch" gap={4}>
           <Typography variant="delta" tag="h2">Dry-run preview</Typography>
           <Typography variant="pi" textColor="neutral600">
-            The exact document that would be sent to Meilisearch for the first published entry of a type.
+            The exact document that would be sent to Meilisearch. Defaults to the most recently updated published entry — pick a specific entry to preview any other.
           </Typography>
-          <Box maxWidth="320px">
-            <SingleSelect label="Content type" value={previewUid || undefined} onChange={(v) => setPreviewUid(v)}>
-              {status.rows.map((r) => <SingleSelectOption key={r.uid} value={r.uid}>{r.type}</SingleSelectOption>)}
-            </SingleSelect>
-          </Box>
+          <Flex gap={4} alignItems="flex-end" wrap="wrap">
+            <Box maxWidth="320px" width="100%">
+              <SingleSelect label="Content type" value={previewUid || undefined} onChange={(v) => setPreviewUid(v)}>
+                {status.rows.map((r) => <SingleSelectOption key={r.uid} value={r.uid}>{r.type}</SingleSelectOption>)}
+              </SingleSelect>
+            </Box>
+            <Box maxWidth="360px" width="100%">
+              <SingleSelect label="Entry" value={previewDocId} onChange={(v) => setPreviewDocId(v)}>
+                <SingleSelectOption value="__latest">Latest updated</SingleSelectOption>
+                {entries.map((e) => <SingleSelectOption key={e.documentId} value={e.documentId}>{e.label}</SingleSelectOption>)}
+              </SingleSelect>
+            </Box>
+          </Flex>
           {previewLoading ? (
             <Flex justifyContent="center" padding={6}><Loader small>Building…</Loader></Flex>
           ) : preview && preview.error ? (
@@ -154,6 +178,13 @@ const OverviewTab = () => {
             <Typography textColor="neutral600">No published entry to preview.</Typography>
           ) : preview && preview.document ? (
             <Flex direction="column" alignItems="stretch" gap={3}>
+              <Flex gap={2} alignItems="center" wrap="wrap">
+                <Typography variant="sigma" textColor="neutral600">Entry</Typography>
+                <Typography variant="pi" textColor="neutral800">{preview.title || preview.documentId}</Typography>
+                {preview.updatedAt && (
+                  <Typography variant="pi" textColor="neutral500">· updated {new Date(preview.updatedAt).toLocaleString()}</Typography>
+                )}
+              </Flex>
               <Flex gap={2} alignItems="center" wrap="wrap">
                 <Typography variant="sigma" textColor="neutral600">Resolved URL</Typography>
                 <Badge>{preview.url || '‹unresolved›'}</Badge>
