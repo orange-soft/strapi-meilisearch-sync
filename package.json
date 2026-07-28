@@ -1,6 +1,6 @@
 {
   "name": "@orange-soft/strapi-meilisearch-sync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Index Strapi content into Meilisearch with UI-configurable flattening, relation-aware routes, real-time sync and cascade reindexing.",
   "keywords": [
     "strapi",
